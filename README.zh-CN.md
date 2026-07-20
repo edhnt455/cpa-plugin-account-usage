@@ -7,12 +7,10 @@
 插件注册接口：
 
 ```text
-POST /v0/management/plugins/cpa-account-usage/api/usage
-GET  /v0/management/plugins/cpa-account-usage/api/usage
 GET  /v0/resource/plugins/cpa-account-usage/api/usage
 ```
 
-Management 接口使用 CPA Management API 鉴权。Resource 接口不需要鉴权，只返回聚合后的余额结果，不返回账号邮箱、文件名、auth_index 等明细。
+该接口不需要鉴权，只返回聚合后的余额结果，不返回账号邮箱、文件名、auth_index 等明细。
 
 ## cc-switch 配置
 
@@ -54,7 +52,7 @@ http://127.0.0.1:8317/v0/resource/plugins/cpa-account-usage
 - Kimi：`https://api.kimi.com/coding/v1/usages`
 - Antigravity/Gemini：Google Antigravity quota summary 接口
 
-这些 provider 的 `balance` 表示剩余百分比，`unit` 为 `%`。响应顶层会尽量返回 `reset_at`、`used_percent`、`reset_credits`、`raw_balance` 等字段；Management 接口的每个账号明细也会包含这些字段。
+这些 provider 的 `balance` 表示剩余百分比，`unit` 为 `%`。响应顶层会尽量返回 `reset_at`、`used_percent`、`reset_credits`、`raw_balance` 等字段。
 
 Antigravity/Gemini 刷新 token 是可选能力。如果 CPA 已经能给插件有效 access token，不需要额外配置；只有插件需要刷新过期 Antigravity token 时，才需要在插件配置里设置 `antigravity_oauth_client_id` 和 `antigravity_oauth_client_secret`。
 

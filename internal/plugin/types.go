@@ -26,8 +26,7 @@ const (
 const (
 	PluginID             = "cpa-account-usage"
 	PluginName           = "cpa-account-usage"
-	Version              = "0.3.2"
-	UsageRoutePath       = "/plugins/cpa-account-usage/api/usage"
+	Version              = "0.4.0"
 	PublicUsageRoutePath = "/api/usage"
 )
 
@@ -79,14 +78,7 @@ type Capabilities struct {
 }
 
 type ManagementRegistration struct {
-	Routes    []ManagementRoute `json:"routes,omitempty"`
-	Resources []ResourceRoute   `json:"resources,omitempty"`
-}
-
-type ManagementRoute struct {
-	Method      string `json:"Method"`
-	Path        string `json:"Path"`
-	Description string `json:"Description,omitempty"`
+	Resources []ResourceRoute `json:"resources,omitempty"`
 }
 
 type ResourceRoute struct {

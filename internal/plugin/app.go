@@ -92,15 +92,6 @@ func (a *App) registration() Registration {
 
 func (a *App) managementRegistration() ManagementRegistration {
 	return ManagementRegistration{
-		Routes: []ManagementRoute{{
-			Method:      http.MethodPost,
-			Path:        UsageRoutePath,
-			Description: "cc-switch friendly account usage endpoint.",
-		}, {
-			Method:      http.MethodGet,
-			Path:        UsageRoutePath,
-			Description: "cc-switch friendly account usage endpoint.",
-		}},
 		Resources: []ResourceRoute{{
 			Path:        PublicUsageRoutePath,
 			Description: "Unauthenticated cc-switch friendly account usage endpoint.",

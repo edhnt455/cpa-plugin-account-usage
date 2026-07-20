@@ -7,12 +7,10 @@ Repository: <https://github.com/edhnt455/cpa-plugin-account-usage>
 The plugin registers:
 
 ```text
-POST /v0/management/plugins/cpa-account-usage/api/usage
-GET  /v0/management/plugins/cpa-account-usage/api/usage
 GET  /v0/resource/plugins/cpa-account-usage/api/usage
 ```
 
-Management API authentication is required for `/v0/management/...`. The `/v0/resource/...` endpoint is unauthenticated and returns only aggregate usage fields, without per-account email, file name, or auth index details.
+The endpoint is unauthenticated and returns only aggregate usage fields, without per-account email, file name, or auth index details.
 
 ## cc-switch
 
@@ -54,7 +52,7 @@ By default, the plugin automatically checks official quota endpoints for support
 - Kimi: `https://api.kimi.com/coding/v1/usages`
 - Antigravity/Gemini: Google Antigravity quota summary endpoints
 
-For these providers, `balance` is the remaining percentage and `unit` is `%`. Top-level responses include provider-specific details such as `used_percent`, `reset_at`, `reset_credits`, and `raw_balance` when available. Management per-account entries include the same details.
+For these providers, `balance` is the remaining percentage and `unit` is `%`. Top-level responses include provider-specific details such as `used_percent`, `reset_at`, `reset_credits`, and `raw_balance` when available.
 
 Antigravity/Gemini token refresh is optional. If CPA already exposes a valid access token, no extra config is needed. If the plugin must refresh an expired Antigravity token, set `antigravity_oauth_client_id` and `antigravity_oauth_client_secret` in the plugin config.
 
