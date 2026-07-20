@@ -1,6 +1,6 @@
 # cpa-account-usage
 
-CLIProxyAPI plugin that exposes a cc-switch friendly account availability / balance endpoint.
+CLIProxyAPI plugin that exposes a cc-switch friendly account quota endpoint.
 
 Repository: <https://github.com/edhnt455/cpa-plugin-account-usage>
 
@@ -45,24 +45,35 @@ Then use:
 
 ## Behavior
 
-By default, no upstream quota endpoint is configured. In that mode:
+By default, the plugin automatically checks official quota endpoints for supported providers:
+
+- Codex: `https://chatgpt.com/backend-api/wham/usage`
+- xAI/Grok: `https://cli-chat-proxy.grok.com/v1/billing`
+- Kimi: `https://api.kimi.com/coding/v1/usages`
+- Antigravity/Gemini: Google Antigravity quota summary endpoints
+
+For these providers, `balance` is the remaining percentage and `unit` is `%`. Per-account entries also include provider-specific details such as `used_percent`, `reset_at`, `reset_credits`, and `raw_balance` when available.
+
+Antigravity/Gemini token refresh is optional. If CPA already exposes a valid access token, no extra config is needed. If the plugin must refresh an expired Antigravity token, set `antigravity_oauth_client_id` and `antigravity_oauth_client_secret` in the plugin config.
+
+When a provider has no built-in quota probe, or the official probe fails:
 
 - `balance` is the number of currently available CPA auth accounts.
 - `unit` is `accounts`.
 - `isValid` is true when at least one matching account is available.
 
-When a provider endpoint is configured, the plugin reads a numeric `balance_path` from the upstream JSON response and aggregates known balances.
+When a custom provider endpoint is configured, it overrides the built-in probe for that provider. The plugin reads a numeric `balance_path` from the upstream JSON response and aggregates known balances.
 
 Response shape:
 
 ```json
 {
   "isValid": true,
-  "balance": 2,
-  "unit": "accounts",
-  "available_count": 2,
-  "known_count": 0,
-  "unknown_count": 2,
+  "balance": 67,
+  "unit": "%",
+  "available_count": 1,
+  "known_count": 1,
+  "unknown_count": 0,
   "accounts": []
 }
 ```
@@ -103,19 +114,24 @@ plugins:
     cpa-account-usage:
       enabled: true
       priority: 10
-      aggregate: "sum"
+      aggregate: "max"
       default_unit: "USD"
       status_only_unit: "accounts"
-      include_providers: ["codex", "xai", "gemini", "antigravity"]
-      providers:
-        xai:
-          method: "GET"
-          url: "https://example.invalid/v1/billing"
-          balance_path: "balance"
-          unit: "USD"
-          error_path: "error"
-          headers:
-            Authorization: "Bearer $TOKEN$"
+      # Optional. Only needed when refreshing expired Antigravity/Gemini tokens.
+      # antigravity_oauth_client_id: ""
+      # antigravity_oauth_client_secret: ""
+      include_providers: ["codex", "xai", "kimi", "gemini", "antigravity"]
+      # Optional custom overrides. Built-in Codex, xAI/Grok, Kimi, and
+      # Antigravity/Gemini quota probes are used when no custom URL is set.
+      # providers:
+      #   custom-provider:
+      #     method: "GET"
+      #     url: "https://example.invalid/v1/billing"
+      #     balance_path: "balance"
+      #     unit: "USD"
+      #     error_path: "error"
+      #     headers:
+      #       Authorization: "Bearer $TOKEN$"
 ```
 
 Provider config fields:

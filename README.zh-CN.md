@@ -1,6 +1,6 @@
 # cpa-account-usage
 
-面向 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) 的账号可用性 / 余额查询插件，接口格式兼容 cc-switch。
+面向 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) 的账号剩余额度查询插件，接口格式兼容 cc-switch。
 
 仓库地址：<https://github.com/edhnt455/cpa-plugin-account-usage>
 
@@ -45,13 +45,33 @@ http://127.0.0.1:8317/v0/management/plugins/cpa-account-usage
 
 ## 行为说明
 
-默认不配置上游余额接口时：
+默认会按账号类型自动请求官方额度接口：
+
+- Codex：`https://chatgpt.com/backend-api/wham/usage`
+- xAI/Grok：`https://cli-chat-proxy.grok.com/v1/billing`
+- Kimi：`https://api.kimi.com/coding/v1/usages`
+- Antigravity/Gemini：Google Antigravity quota summary 接口
+
+这些 provider 的 `balance` 表示剩余百分比，`unit` 为 `%`。每个账号明细还会尽量返回 `used_percent`、`reset_at`、`reset_credits`、`raw_balance` 等字段。
+
+Antigravity/Gemini 刷新 token 是可选能力。如果 CPA 已经能给插件有效 access token，不需要额外配置；只有插件需要刷新过期 Antigravity token 时，才需要在插件配置里设置 `antigravity_oauth_client_id` 和 `antigravity_oauth_client_secret`。
+
+当 provider 没有内置官方额度接口，或官方查询失败时：
 
 - `balance` 表示当前可用账号数量。
 - `unit` 为 `accounts`。
 - 至少有一个匹配账号可用时 `isValid=true`。
 
-配置 provider 余额接口后，插件会读取上游 JSON 的 `balance_path`，并聚合已知余额。
+配置自定义 provider 余额接口后，会覆盖该 provider 的内置查询。插件会读取上游 JSON 的 `balance_path`，并聚合已知余额。
+
+示例请求：
+
+```bash
+curl -X POST "http://127.0.0.1:8317/v0/management/plugins/cpa-account-usage/api/usage?provider=codex" \
+  -H "Authorization: Bearer <management-key>"
+```
+
+`provider=grok` 会匹配 xAI 账号；`provider=gemini` 会匹配 Antigravity 账号里的 Gemini 模型额度。
 
 ## 构建
 

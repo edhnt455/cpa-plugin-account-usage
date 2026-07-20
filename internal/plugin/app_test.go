@@ -53,8 +53,83 @@ func TestAggregateAccountsSumsKnownBalances(t *testing.T) {
 	}
 }
 
+func TestAggregateAccountsUsesMaxForPercentBalancesByDefault(t *testing.T) {
+	resp := AggregateAccounts(DefaultConfig(), []AccountUsage{
+		{Available: true, Known: true, Balance: 66, Unit: "%"},
+		{Available: true, Known: true, Balance: 88, Unit: "%"},
+	})
+	if resp.Balance != 88 || resp.Unit != "%" {
+		t.Fatalf("Balance/unit = %v/%q, want 88/%%", resp.Balance, resp.Unit)
+	}
+}
+
 func TestAuthAvailableHonorsCooldown(t *testing.T) {
 	if AuthAvailable(HostAuthFileEntry{Status: "active", NextRetryAfter: time.Now().Add(time.Minute)}) {
 		t.Fatal("AuthAvailable() = true during cooldown")
+	}
+}
+
+func TestProviderMatchesAliases(t *testing.T) {
+	if !providerMatchesFilter("xai", "grok") {
+		t.Fatal("xai should match grok")
+	}
+	if !providerMatchesFilter("antigravity", "gemini") {
+		t.Fatal("antigravity should match gemini")
+	}
+}
+
+func TestCodexQuotaWindowsReturnsRemainingPercent(t *testing.T) {
+	windows := codexQuotaWindows([]byte(`{
+		"rate_limit": {
+			"allowed": true,
+			"limit_reached": false,
+			"primary_window": {
+				"used_percent": 33,
+				"reset_at": 1784968316
+			}
+		}
+	}`))
+	remaining, ok := minimumRemaining(windows)
+	if !ok || remaining != 67 {
+		t.Fatalf("remaining = %v/%v, want 67/true", remaining, ok)
+	}
+}
+
+func TestKimiQuotaRowsUseRemainingOverUsedFallback(t *testing.T) {
+	rows := kimiQuotaRows([]byte(`{
+		"usage": {"limit": 100, "remaining": 25},
+		"limits": [{"detail": {"limit": 50, "used": 10}}]
+	}`))
+	remaining, ok := minimumRemaining(rows)
+	if !ok || remaining != 25 {
+		t.Fatalf("remaining = %v/%v, want 25/true", remaining, ok)
+	}
+}
+
+func TestXaiSummaryReturnsCreditRemainingPercent(t *testing.T) {
+	summary, ok := parseXaiSummary([]byte(`{
+		"config": {
+			"currentPeriod": {"type": "weekly"},
+			"creditUsagePercent": 10
+		}
+	}`))
+	if !ok || summary.RemainingPercent == nil || *summary.RemainingPercent != 90 {
+		t.Fatalf("summary = %#v, ok=%v, want 90%% remaining", summary, ok)
+	}
+}
+
+func TestAntigravityBucketsCanFilterGeminiGroup(t *testing.T) {
+	buckets := antigravityBuckets([]byte(`{
+		"groups": [{
+			"displayName": "Gemini Models",
+			"buckets": [{"remainingFraction": 0.72}]
+		}, {
+			"displayName": "Claude and GPT Models",
+			"buckets": [{"remainingFraction": 0.15}]
+		}]
+	}`), "gemini")
+	remaining, ok := minimumRemaining(buckets)
+	if !ok || remaining != 72 {
+		t.Fatalf("remaining = %v/%v, want 72/true", remaining, ok)
 	}
 }

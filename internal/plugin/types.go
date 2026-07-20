@@ -26,7 +26,7 @@ const (
 const (
 	PluginID       = "cpa-account-usage"
 	PluginName     = "cpa-account-usage"
-	Version        = "0.1.0"
+	Version        = "0.2.0"
 	UsageRoutePath = "/plugins/cpa-account-usage/api/usage"
 )
 
@@ -103,13 +103,15 @@ type ManagementResponse struct {
 }
 
 type PluginConfig struct {
-	Enabled          bool                      `yaml:"enabled"`
-	Aggregate        string                    `yaml:"aggregate"`
-	DefaultUnit      string                    `yaml:"default_unit"`
-	StatusOnlyUnit   string                    `yaml:"status_only_unit"`
-	IncludeProviders []string                  `yaml:"include_providers"`
-	ExcludeProviders []string                  `yaml:"exclude_providers"`
-	Providers        map[string]ProviderConfig `yaml:"providers"`
+	Enabled                       bool                      `yaml:"enabled"`
+	Aggregate                     string                    `yaml:"aggregate"`
+	DefaultUnit                   string                    `yaml:"default_unit"`
+	StatusOnlyUnit                string                    `yaml:"status_only_unit"`
+	AntigravityOAuthClientID     string                    `yaml:"antigravity_oauth_client_id"`
+	AntigravityOAuthClientSecret string                    `yaml:"antigravity_oauth_client_secret"`
+	IncludeProviders              []string                  `yaml:"include_providers"`
+	ExcludeProviders              []string                  `yaml:"exclude_providers"`
+	Providers                     map[string]ProviderConfig `yaml:"providers"`
 }
 
 type ProviderConfig struct {
@@ -155,8 +157,14 @@ type AccountUsage struct {
 	Known          bool    `json:"known"`
 	Balance        float64 `json:"balance,omitempty"`
 	Unit           string  `json:"unit,omitempty"`
+	Source         string  `json:"source,omitempty"`
+	ResetAt        string  `json:"reset_at,omitempty"`
+	UsedPercent    float64 `json:"used_percent,omitempty"`
+	RawBalance     string  `json:"raw_balance,omitempty"`
+	ResetCredits   int     `json:"reset_credits,omitempty"`
 	NextRetryAfter string  `json:"next_retry_after,omitempty"`
 	Error          string  `json:"error,omitempty"`
+	Details        any     `json:"details,omitempty"`
 }
 
 type HostAuthListResponse struct {
@@ -177,6 +185,10 @@ type HostAuthFileEntry struct {
 	Email          string    `json:"email,omitempty"`
 	AccountType    string    `json:"account_type,omitempty"`
 	Account        string    `json:"account,omitempty"`
+	ProjectID      string    `json:"project_id,omitempty"`
+	UserID         string    `json:"user_id,omitempty"`
+	Subject        string    `json:"subject,omitempty"`
+	Sub            string    `json:"sub,omitempty"`
 	NextRetryAfter time.Time `json:"next_retry_after,omitempty"`
 }
 

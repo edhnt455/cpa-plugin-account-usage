@@ -79,6 +79,8 @@ func (a *App) registration() Registration {
 				{Name: "aggregate", Type: "enum", EnumValues: []string{"sum", "min", "max", "first"}, Description: "How known balances are aggregated."},
 				{Name: "default_unit", Type: "string", Description: "Default unit for provider HTTP quota responses."},
 				{Name: "status_only_unit", Type: "string", Description: "Unit used when no provider quota endpoint is configured."},
+				{Name: "antigravity_oauth_client_id", Type: "string", Description: "Optional OAuth client id used only when Antigravity access tokens must be refreshed."},
+				{Name: "antigravity_oauth_client_secret", Type: "string", Description: "Optional OAuth client secret used only when Antigravity access tokens must be refreshed."},
 				{Name: "include_providers", Type: "array", Description: "Optional provider allow-list."},
 				{Name: "exclude_providers", Type: "array", Description: "Optional provider deny-list."},
 				{Name: "providers", Type: "object", Description: "Per-provider quota endpoint definitions."},
@@ -143,7 +145,7 @@ func (a *App) runUsageRequest(req ManagementRequest) (UsageResponse, int) {
 		if !authMatchesFilter(cfg, filter, auth) {
 			continue
 		}
-		accounts = append(accounts, a.inspectAuthUsage(cfg, auth, req.HostCallbackID))
+		accounts = append(accounts, a.inspectAuthUsage(cfg, filter, auth, req.HostCallbackID))
 	}
 	resp := AggregateAccounts(cfg, accounts)
 	if len(accounts) == 0 {
@@ -159,21 +161,21 @@ func authMatchesFilter(cfg PluginConfig, filter UsageRequest, auth HostAuthFileE
 	if filter.AuthIndex != "" && auth.AuthIndex != filter.AuthIndex {
 		return false
 	}
-	provider := strings.ToLower(strings.TrimSpace(firstNonEmpty(auth.Provider, auth.Type)))
-	if filter.Provider != "" && provider != filter.Provider {
+	provider := normalizeProvider(firstNonEmpty(auth.Provider, auth.Type))
+	if filter.Provider != "" && !providerMatchesFilter(provider, filter.Provider) {
 		return false
 	}
-	if len(cfg.IncludeProviders) > 0 && !stringInSlice(provider, cfg.IncludeProviders) {
+	if len(cfg.IncludeProviders) > 0 && !providerInList(provider, cfg.IncludeProviders) {
 		return false
 	}
-	if stringInSlice(provider, cfg.ExcludeProviders) {
+	if providerInList(provider, cfg.ExcludeProviders) {
 		return false
 	}
 	return true
 }
 
-func (a *App) inspectAuthUsage(cfg PluginConfig, auth HostAuthFileEntry, hostCallbackID string) AccountUsage {
-	provider := strings.ToLower(strings.TrimSpace(firstNonEmpty(auth.Provider, auth.Type)))
+func (a *App) inspectAuthUsage(cfg PluginConfig, filter UsageRequest, auth HostAuthFileEntry, hostCallbackID string) AccountUsage {
+	provider := normalizeProvider(firstNonEmpty(auth.Provider, auth.Type))
 	result := AccountUsage{
 		AuthIndex:      auth.AuthIndex,
 		Name:           auth.Name,
@@ -187,7 +189,30 @@ func (a *App) inspectAuthUsage(cfg PluginConfig, auth HostAuthFileEntry, hostCal
 		NextRetryAfter: timeString(auth.NextRetryAfter),
 	}
 	providerCfg, okProvider := cfg.Providers[provider]
-	if !okProvider || !providerConfigEnabled(providerCfg) || providerCfg.URL == "" || !result.Available {
+	if okProvider && !providerConfigEnabled(providerCfg) {
+		return result
+	}
+	if !okProvider || providerCfg.URL == "" || !result.Available {
+		if !result.Available {
+			return result
+		}
+		official, okOfficial := a.fetchOfficialBalance(provider, filter.Provider, auth, hostCallbackID)
+		if !okOfficial {
+			return result
+		}
+		if official.Error != "" {
+			result.Error = official.Error
+			return result
+		}
+		result.Known = true
+		result.Balance = official.Balance
+		result.Unit = official.Unit
+		result.Source = official.Source
+		result.ResetAt = official.ResetAt
+		result.UsedPercent = official.UsedPercent
+		result.RawBalance = official.RawBalance
+		result.ResetCredits = official.ResetCredits
+		result.Details = official.Details
 		return result
 	}
 	balance, unit, errCheck := a.fetchProviderBalance(providerCfg, auth, hostCallbackID, cfg.DefaultUnit)
@@ -414,7 +439,11 @@ func AggregateAccounts(cfg PluginConfig, accounts []AccountUsage) UsageResponse 
 		if account.Known {
 			resp.KnownCount++
 			units[account.Unit] = struct{}{}
-			resp.Balance = aggregateValue(cfg.Aggregate, resp.Balance, account.Balance, resp.KnownCount)
+			mode := cfg.Aggregate
+			if account.Unit == "%" && (mode == "" || mode == "sum") {
+				mode = "max"
+			}
+			resp.Balance = aggregateValue(mode, resp.Balance, account.Balance, resp.KnownCount)
 			continue
 		}
 		resp.UnknownCount++
@@ -475,7 +504,7 @@ func JSONResponse(statusCode int, body any) ManagementResponse {
 func normalizeProviderList(values []string) []string {
 	out := make([]string, 0, len(values))
 	for _, value := range values {
-		value = strings.ToLower(strings.TrimSpace(value))
+		value = normalizeProvider(value)
 		if value != "" {
 			out = append(out, value)
 		}
@@ -525,6 +554,38 @@ func firstNonEmpty(values ...string) string {
 func stringInSlice(value string, list []string) bool {
 	for _, item := range list {
 		if item == value {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeProvider(provider string) string {
+	key := strings.ToLower(strings.TrimSpace(provider))
+	key = strings.ReplaceAll(key, "_", "-")
+	switch key {
+	case "grok", "x-ai":
+		return "xai"
+	default:
+		return key
+	}
+}
+
+func providerMatchesFilter(provider string, filter string) bool {
+	provider = normalizeProvider(provider)
+	filter = normalizeProvider(filter)
+	if provider == filter {
+		return true
+	}
+	if filter == "gemini" && provider == "antigravity" {
+		return true
+	}
+	return false
+}
+
+func providerInList(provider string, list []string) bool {
+	for _, item := range list {
+		if providerMatchesFilter(provider, item) || providerMatchesFilter(item, provider) {
 			return true
 		}
 	}

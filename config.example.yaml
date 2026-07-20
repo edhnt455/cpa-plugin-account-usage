@@ -5,22 +5,27 @@ plugins:
     cpa-account-usage:
       enabled: true
       priority: 10
-      aggregate: "sum"
+      aggregate: "max"
       default_unit: "USD"
       status_only_unit: "accounts"
+      # Optional. Only needed if an Antigravity/Gemini access token is expired
+      # and must be refreshed by the plugin.
+      # antigravity_oauth_client_id: ""
+      # antigravity_oauth_client_secret: ""
       include_providers:
         - codex
         - xai
+        - kimi
         - gemini
         - antigravity
-      providers:
-        # Example only. Replace URL and JSON paths with the real quota endpoint
-        # for your relay/provider account.
-        xai:
-          method: "GET"
-          url: "https://example.invalid/v1/billing"
-          balance_path: "balance"
-          unit: "USD"
-          error_path: "error"
-          headers:
-            Authorization: "Bearer $TOKEN$"
+      # Optional custom overrides. Built-in Codex, xAI/Grok, Kimi, and
+      # Antigravity/Gemini quota probes are used when no custom URL is set.
+      # providers:
+      #   custom-provider:
+      #     method: "GET"
+      #     url: "https://example.invalid/v1/billing"
+      #     balance_path: "balance"
+      #     unit: "USD"
+      #     error_path: "error"
+      #     headers:
+      #       Authorization: "Bearer $TOKEN$"
