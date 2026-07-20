@@ -259,11 +259,13 @@ func (a *App) fetchXaiOfficialBalance(auth HostAuthFileEntry, hostCallbackID str
 		return officialBalance{Error: "xai billing payload did not contain usable quota fields"}
 	}
 	remaining := math.Inf(1)
+	resetAt := ""
 	details := make([]xaiSummary, 0, len(summaries))
 	for _, summary := range summaries {
 		details = append(details, summary)
 		if summary.RemainingPercent != nil && *summary.RemainingPercent < remaining {
 			remaining = *summary.RemainingPercent
+			resetAt = summary.ResetAt
 		}
 	}
 	if math.IsInf(remaining, 1) {
@@ -273,6 +275,7 @@ func (a *App) fetchXaiOfficialBalance(auth HostAuthFileEntry, hostCallbackID str
 		Balance:     round2(remaining),
 		Unit:        "%",
 		Source:      "xai-billing",
+		ResetAt:     resetAt,
 		UsedPercent: round2(100 - remaining),
 		Details:     map[string]any{"summaries": details},
 	}
@@ -280,6 +283,9 @@ func (a *App) fetchXaiOfficialBalance(auth HostAuthFileEntry, hostCallbackID str
 
 type xaiSummary struct {
 	PeriodType       string   `json:"period_type"`
+	PeriodStart      string   `json:"period_start,omitempty"`
+	PeriodEnd        string   `json:"period_end,omitempty"`
+	ResetAt          string   `json:"reset_at,omitempty"`
 	RemainingPercent *float64 `json:"remaining_percent,omitempty"`
 	MonthlyRemaining *float64 `json:"monthly_remaining_usd,omitempty"`
 }
@@ -293,7 +299,23 @@ func parseXaiSummary(body []byte) (xaiSummary, bool) {
 	if periodType == "" {
 		periodType = strings.ToLower(cfg.Get("current_period.type").String())
 	}
-	summary := xaiSummary{PeriodType: periodType}
+	currentPeriod := firstResult(cfg, "currentPeriod", "current_period")
+	periodStart := firstNonEmpty(
+		currentPeriod.Get("start").String(),
+		cfg.Get("billingPeriodStart").String(),
+		cfg.Get("billing_period_start").String(),
+	)
+	periodEnd := firstNonEmpty(
+		currentPeriod.Get("end").String(),
+		cfg.Get("billingPeriodEnd").String(),
+		cfg.Get("billing_period_end").String(),
+	)
+	summary := xaiSummary{
+		PeriodType:  periodType,
+		PeriodStart: periodStart,
+		PeriodEnd:   periodEnd,
+		ResetAt:     periodEnd,
+	}
 	if used, okUsed := firstGJSONFloat(cfg, "creditUsagePercent", "credit_usage_percent"); okUsed {
 		remaining := round2(clampPercent(100 - used))
 		summary.RemainingPercent = &remaining

@@ -26,7 +26,7 @@ const (
 const (
 	PluginID             = "cpa-account-usage"
 	PluginName           = "cpa-account-usage"
-	Version              = "0.3.1"
+	Version              = "0.3.2"
 	UsageRoutePath       = "/plugins/cpa-account-usage/api/usage"
 	PublicUsageRoutePath = "/api/usage"
 )
