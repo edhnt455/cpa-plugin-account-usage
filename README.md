@@ -9,16 +9,17 @@ The plugin registers:
 ```text
 POST /v0/management/plugins/cpa-account-usage/api/usage
 GET  /v0/management/plugins/cpa-account-usage/api/usage
+GET  /v0/resource/plugins/cpa-account-usage/api/usage
 ```
 
-Management API authentication is still required.
+Management API authentication is required for `/v0/management/...`. The `/v0/resource/...` endpoint is unauthenticated and returns only aggregate usage fields, without per-account email, file name, or auth index details.
 
 ## cc-switch
 
 Set `baseUrl` to:
 
 ```text
-http://127.0.0.1:8317/v0/management/plugins/cpa-account-usage
+http://127.0.0.1:8317/v0/resource/plugins/cpa-account-usage
 ```
 
 Then use:
@@ -26,10 +27,9 @@ Then use:
 ```js
 ({
   request: {
-    url: "{{baseUrl}}/api/usage",
-    method: "POST",
+    url: "{{baseUrl}}/api/usage?provider=codex",
+    method: "GET",
     headers: {
-      "Authorization": "Bearer {{apiKey}}",
       "User-Agent": "cc-switch/1.0"
     }
   },

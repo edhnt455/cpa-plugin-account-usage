@@ -78,6 +78,25 @@ func TestProviderMatchesAliases(t *testing.T) {
 	}
 }
 
+func TestPublicUsageResponseStripsAccounts(t *testing.T) {
+	resp := publicUsageResponse(UsageResponse{
+		IsValid: true,
+		Balance: 53,
+		Unit:    "%",
+		Accounts: []AccountUsage{{
+			AuthIndex: "secret-auth-index",
+			Email:     "user@example.com",
+			Name:      "codex-user.json",
+		}},
+	})
+	if len(resp.Accounts) != 0 {
+		t.Fatalf("Accounts len = %d, want 0", len(resp.Accounts))
+	}
+	if !resp.IsValid || resp.Balance != 53 || resp.Unit != "%" {
+		t.Fatalf("public response summary changed: %#v", resp)
+	}
+}
+
 func TestCodexQuotaWindowsReturnsRemainingPercent(t *testing.T) {
 	windows := codexQuotaWindows([]byte(`{
 		"rate_limit": {

@@ -101,6 +101,10 @@ func (a *App) managementRegistration() ManagementRegistration {
 			Path:        UsageRoutePath,
 			Description: "cc-switch friendly account usage endpoint.",
 		}},
+		Resources: []ResourceRoute{{
+			Path:        PublicUsageRoutePath,
+			Description: "Unauthenticated cc-switch friendly account usage endpoint.",
+		}},
 	}
 }
 
@@ -112,6 +116,9 @@ func (a *App) handleManagement(raw []byte) ([]byte, error) {
 		}
 	}
 	response, statusCode := a.runUsageRequest(req)
+	if isPublicUsageRequest(req) {
+		response = publicUsageResponse(response)
+	}
 	return OKEnvelope(JSONResponse(statusCode, response))
 }
 
@@ -460,6 +467,16 @@ func AggregateAccounts(cfg PluginConfig, accounts []AccountUsage) UsageResponse 
 	} else {
 		resp.Unit = "mixed"
 	}
+	return resp
+}
+
+func isPublicUsageRequest(req ManagementRequest) bool {
+	path := strings.TrimRight(strings.TrimSpace(req.Path), "/")
+	return strings.Contains(path, "/v0/resource/plugins/") && strings.HasSuffix(path, PublicUsageRoutePath)
+}
+
+func publicUsageResponse(resp UsageResponse) UsageResponse {
+	resp.Accounts = []AccountUsage{}
 	return resp
 }
 

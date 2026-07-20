@@ -9,16 +9,17 @@
 ```text
 POST /v0/management/plugins/cpa-account-usage/api/usage
 GET  /v0/management/plugins/cpa-account-usage/api/usage
+GET  /v0/resource/plugins/cpa-account-usage/api/usage
 ```
 
-该接口仍使用 CPA Management API 鉴权。
+Management 接口使用 CPA Management API 鉴权。Resource 接口不需要鉴权，只返回聚合后的余额结果，不返回账号邮箱、文件名、auth_index 等明细。
 
 ## cc-switch 配置
 
 `baseUrl` 填：
 
 ```text
-http://127.0.0.1:8317/v0/management/plugins/cpa-account-usage
+http://127.0.0.1:8317/v0/resource/plugins/cpa-account-usage
 ```
 
 然后使用：
@@ -26,10 +27,9 @@ http://127.0.0.1:8317/v0/management/plugins/cpa-account-usage
 ```js
 ({
   request: {
-    url: "{{baseUrl}}/api/usage",
-    method: "POST",
+    url: "{{baseUrl}}/api/usage?provider=codex",
+    method: "GET",
     headers: {
-      "Authorization": "Bearer {{apiKey}}",
       "User-Agent": "cc-switch/1.0"
     }
   },
@@ -67,8 +67,7 @@ Antigravity/Gemini 刷新 token 是可选能力。如果 CPA 已经能给插件�
 示例请求：
 
 ```bash
-curl -X POST "http://127.0.0.1:8317/v0/management/plugins/cpa-account-usage/api/usage?provider=codex" \
-  -H "Authorization: Bearer <management-key>"
+curl "http://127.0.0.1:8317/v0/resource/plugins/cpa-account-usage/api/usage?provider=codex"
 ```
 
 `provider=grok` 会匹配 xAI 账号；`provider=gemini` 会匹配 Antigravity 账号里的 Gemini 模型额度。

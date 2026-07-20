@@ -24,10 +24,11 @@ const (
 )
 
 const (
-	PluginID       = "cpa-account-usage"
-	PluginName     = "cpa-account-usage"
-	Version        = "0.2.0"
-	UsageRoutePath = "/plugins/cpa-account-usage/api/usage"
+	PluginID             = "cpa-account-usage"
+	PluginName           = "cpa-account-usage"
+	Version              = "0.3.0"
+	UsageRoutePath       = "/plugins/cpa-account-usage/api/usage"
+	PublicUsageRoutePath = "/api/usage"
 )
 
 type HostCaller interface {
@@ -78,12 +79,19 @@ type Capabilities struct {
 }
 
 type ManagementRegistration struct {
-	Routes []ManagementRoute `json:"routes,omitempty"`
+	Routes    []ManagementRoute `json:"routes,omitempty"`
+	Resources []ResourceRoute   `json:"resources,omitempty"`
 }
 
 type ManagementRoute struct {
 	Method      string `json:"Method"`
 	Path        string `json:"Path"`
+	Description string `json:"Description,omitempty"`
+}
+
+type ResourceRoute struct {
+	Path        string `json:"Path"`
+	Menu        string `json:"Menu,omitempty"`
 	Description string `json:"Description,omitempty"`
 }
 
