@@ -37,7 +37,9 @@ Then use:
     return {
       isValid: !response.error,
       remaining: response.balance,
-      unit: response.unit || "accounts"
+      unit: response.unit || "accounts",
+      resetAt: response.reset_at,
+      usedPercent: response.used_percent
     };
   }
 })
@@ -52,7 +54,7 @@ By default, the plugin automatically checks official quota endpoints for support
 - Kimi: `https://api.kimi.com/coding/v1/usages`
 - Antigravity/Gemini: Google Antigravity quota summary endpoints
 
-For these providers, `balance` is the remaining percentage and `unit` is `%`. Per-account entries also include provider-specific details such as `used_percent`, `reset_at`, `reset_credits`, and `raw_balance` when available.
+For these providers, `balance` is the remaining percentage and `unit` is `%`. Top-level responses include provider-specific details such as `used_percent`, `reset_at`, `reset_credits`, and `raw_balance` when available. Management per-account entries include the same details.
 
 Antigravity/Gemini token refresh is optional. If CPA already exposes a valid access token, no extra config is needed. If the plugin must refresh an expired Antigravity token, set `antigravity_oauth_client_id` and `antigravity_oauth_client_secret` in the plugin config.
 
@@ -74,6 +76,8 @@ Response shape:
   "available_count": 1,
   "known_count": 1,
   "unknown_count": 0,
+  "reset_at": "2026-07-25T08:31:56Z",
+  "used_percent": 33,
   "accounts": []
 }
 ```

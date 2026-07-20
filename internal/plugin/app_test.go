@@ -55,11 +55,14 @@ func TestAggregateAccountsSumsKnownBalances(t *testing.T) {
 
 func TestAggregateAccountsUsesMaxForPercentBalancesByDefault(t *testing.T) {
 	resp := AggregateAccounts(DefaultConfig(), []AccountUsage{
-		{Available: true, Known: true, Balance: 66, Unit: "%"},
-		{Available: true, Known: true, Balance: 88, Unit: "%"},
+		{Available: true, Known: true, Balance: 66, Unit: "%", ResetAt: "2026-07-25T08:31:56Z", UsedPercent: 34, ResetCredits: 3, RawBalance: "0"},
+		{Available: true, Known: true, Balance: 88, Unit: "%", ResetAt: "2026-07-26T08:31:56Z", UsedPercent: 12, ResetCredits: 1, RawBalance: "5"},
 	})
 	if resp.Balance != 88 || resp.Unit != "%" {
 		t.Fatalf("Balance/unit = %v/%q, want 88/%%", resp.Balance, resp.Unit)
+	}
+	if resp.ResetAt != "2026-07-26T08:31:56Z" || resp.UsedPercent != 12 || resp.ResetCredits != 1 || resp.RawBalance != "5" {
+		t.Fatalf("top-level quota details = %q/%v/%d/%q, want selected account details", resp.ResetAt, resp.UsedPercent, resp.ResetCredits, resp.RawBalance)
 	}
 }
 
@@ -80,9 +83,11 @@ func TestProviderMatchesAliases(t *testing.T) {
 
 func TestPublicUsageResponseStripsAccounts(t *testing.T) {
 	resp := publicUsageResponse(UsageResponse{
-		IsValid: true,
-		Balance: 53,
-		Unit:    "%",
+		IsValid:     true,
+		Balance:     53,
+		Unit:        "%",
+		ResetAt:     "2026-07-25T08:31:56Z",
+		UsedPercent: 47,
 		Accounts: []AccountUsage{{
 			AuthIndex: "secret-auth-index",
 			Email:     "user@example.com",
@@ -94,6 +99,9 @@ func TestPublicUsageResponseStripsAccounts(t *testing.T) {
 	}
 	if !resp.IsValid || resp.Balance != 53 || resp.Unit != "%" {
 		t.Fatalf("public response summary changed: %#v", resp)
+	}
+	if resp.ResetAt != "2026-07-25T08:31:56Z" || resp.UsedPercent != 47 {
+		t.Fatalf("public quota details = %q/%v, want reset/47", resp.ResetAt, resp.UsedPercent)
 	}
 }
 

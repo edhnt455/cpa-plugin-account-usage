@@ -26,7 +26,7 @@ const (
 const (
 	PluginID             = "cpa-account-usage"
 	PluginName           = "cpa-account-usage"
-	Version              = "0.3.0"
+	Version              = "0.3.1"
 	UsageRoutePath       = "/plugins/cpa-account-usage/api/usage"
 	PublicUsageRoutePath = "/api/usage"
 )
@@ -151,6 +151,10 @@ type UsageResponse struct {
 	AvailableCount int            `json:"available_count"`
 	KnownCount     int            `json:"known_count"`
 	UnknownCount   int            `json:"unknown_count"`
+	ResetAt        string         `json:"reset_at,omitempty"`
+	UsedPercent    float64        `json:"used_percent,omitempty"`
+	RawBalance     string         `json:"raw_balance,omitempty"`
+	ResetCredits   int            `json:"reset_credits,omitempty"`
 	Error          string         `json:"error,omitempty"`
 }
 

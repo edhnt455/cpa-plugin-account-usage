@@ -450,6 +450,9 @@ func AggregateAccounts(cfg PluginConfig, accounts []AccountUsage) UsageResponse 
 			if account.Unit == "%" && (mode == "" || mode == "sum") {
 				mode = "max"
 			}
+			if aggregateSelectsAccount(mode, resp.Balance, account.Balance, resp.KnownCount) {
+				applyAccountSummary(&resp, account)
+			}
 			resp.Balance = aggregateValue(mode, resp.Balance, account.Balance, resp.KnownCount)
 			continue
 		}
@@ -468,6 +471,24 @@ func AggregateAccounts(cfg PluginConfig, accounts []AccountUsage) UsageResponse 
 		resp.Unit = "mixed"
 	}
 	return resp
+}
+
+func aggregateSelectsAccount(mode string, current, next float64, count int) bool {
+	switch mode {
+	case "min":
+		return count == 1 || next < current
+	case "max":
+		return count == 1 || next > current
+	default:
+		return count == 1
+	}
+}
+
+func applyAccountSummary(resp *UsageResponse, account AccountUsage) {
+	resp.ResetAt = account.ResetAt
+	resp.UsedPercent = account.UsedPercent
+	resp.RawBalance = account.RawBalance
+	resp.ResetCredits = account.ResetCredits
 }
 
 func isPublicUsageRequest(req ManagementRequest) bool {

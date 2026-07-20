@@ -37,7 +37,9 @@ http://127.0.0.1:8317/v0/resource/plugins/cpa-account-usage
     return {
       isValid: !response.error,
       remaining: response.balance,
-      unit: response.unit || "accounts"
+      unit: response.unit || "accounts",
+      resetAt: response.reset_at,
+      usedPercent: response.used_percent
     };
   }
 })
@@ -52,7 +54,7 @@ http://127.0.0.1:8317/v0/resource/plugins/cpa-account-usage
 - Kimi：`https://api.kimi.com/coding/v1/usages`
 - Antigravity/Gemini：Google Antigravity quota summary 接口
 
-这些 provider 的 `balance` 表示剩余百分比，`unit` 为 `%`。每个账号明细还会尽量返回 `used_percent`、`reset_at`、`reset_credits`、`raw_balance` 等字段。
+这些 provider 的 `balance` 表示剩余百分比，`unit` 为 `%`。响应顶层会尽量返回 `reset_at`、`used_percent`、`reset_credits`、`raw_balance` 等字段；Management 接口的每个账号明细也会包含这些字段。
 
 Antigravity/Gemini 刷新 token 是可选能力。如果 CPA 已经能给插件有效 access token，不需要额外配置；只有插件需要刷新过期 Antigravity token 时，才需要在插件配置里设置 `antigravity_oauth_client_id` 和 `antigravity_oauth_client_secret`。
 
