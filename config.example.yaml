@@ -1,0 +1,26 @@
+plugins:
+  enabled: true
+  dir: "plugins"
+  configs:
+    cpa-account-usage:
+      enabled: true
+      priority: 10
+      aggregate: "sum"
+      default_unit: "USD"
+      status_only_unit: "accounts"
+      include_providers:
+        - codex
+        - xai
+        - gemini
+        - antigravity
+      providers:
+        # Example only. Replace URL and JSON paths with the real quota endpoint
+        # for your relay/provider account.
+        xai:
+          method: "GET"
+          url: "https://example.invalid/v1/billing"
+          balance_path: "balance"
+          unit: "USD"
+          error_path: "error"
+          headers:
+            Authorization: "Bearer $TOKEN$"
