@@ -20,7 +20,6 @@ const (
 	codexUsageURL                 = "https://chatgpt.com/backend-api/wham/usage"
 	kimiUsageURL                  = "https://api.kimi.com/coding/v1/usages"
 	xaiBillingWeeklyURL           = "https://cli-chat-proxy.grok.com/v1/billing?format=credits"
-	xaiBillingMonthlyURL          = "https://cli-chat-proxy.grok.com/v1/billing"
 	antigravityQuotaURLPrimary    = "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary"
 	antigravityQuotaURLSandbox    = "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:retrieveUserQuotaSummary"
 	antigravityQuotaURLProduction = "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary"
@@ -240,44 +239,22 @@ func (a *App) fetchXaiOfficialBalance(auth HostAuthFileEntry, hostCallbackID str
 	if userID := xaiUserID(auth, rawAuthJSON); userID != "" {
 		headers["x-userid"] = userID
 	}
-	var summaries []xaiSummary
-	var errs []string
-	for _, targetURL := range []string{xaiBillingWeeklyURL, xaiBillingMonthlyURL} {
-		body, errHTTP := a.doHostHTTP(http.MethodGet, targetURL, headers, nil, hostCallbackID)
-		if errHTTP != nil {
-			errs = append(errs, errHTTP.Error())
-			continue
-		}
-		if summary, okSummary := parseXaiSummary(body); okSummary {
-			summaries = append(summaries, summary)
-		}
+	body, errHTTP := a.doHostHTTP(http.MethodGet, xaiBillingWeeklyURL, headers, nil, hostCallbackID)
+	if errHTTP != nil {
+		return officialBalance{Error: errHTTP.Error()}
 	}
-	if len(summaries) == 0 {
-		if len(errs) > 0 {
-			return officialBalance{Error: strings.Join(errs, "; ")}
-		}
-		return officialBalance{Error: "xai billing payload did not contain usable quota fields"}
+	summary, okSummary := parseXaiWeeklySummary(body)
+	if !okSummary || summary.RemainingPercent == nil {
+		return officialBalance{Error: "xai weekly billing payload did not contain usable remaining percent"}
 	}
-	remaining := math.Inf(1)
-	resetAt := ""
-	details := make([]xaiSummary, 0, len(summaries))
-	for _, summary := range summaries {
-		details = append(details, summary)
-		if summary.RemainingPercent != nil && *summary.RemainingPercent < remaining {
-			remaining = *summary.RemainingPercent
-			resetAt = summary.ResetAt
-		}
-	}
-	if math.IsInf(remaining, 1) {
-		return officialBalance{Error: "xai billing payload did not contain usable remaining percent"}
-	}
+	remaining := *summary.RemainingPercent
 	return officialBalance{
 		Balance:     round2(remaining),
 		Unit:        "%",
 		Source:      "xai-billing",
-		ResetAt:     resetAt,
+		ResetAt:     summary.ResetAt,
 		UsedPercent: round2(100 - remaining),
-		Details:     map[string]any{"summaries": details},
+		Details:     map[string]any{"summaries": []xaiSummary{summary}},
 	}
 }
 
@@ -287,10 +264,9 @@ type xaiSummary struct {
 	PeriodEnd        string   `json:"period_end,omitempty"`
 	ResetAt          string   `json:"reset_at,omitempty"`
 	RemainingPercent *float64 `json:"remaining_percent,omitempty"`
-	MonthlyRemaining *float64 `json:"monthly_remaining_usd,omitempty"`
 }
 
-func parseXaiSummary(body []byte) (xaiSummary, bool) {
+func parseXaiWeeklySummary(body []byte) (xaiSummary, bool) {
 	cfg := gjson.GetBytes(body, "config")
 	if !cfg.Exists() || cfg.Type == gjson.Null {
 		return xaiSummary{}, false
@@ -319,16 +295,6 @@ func parseXaiSummary(body []byte) (xaiSummary, bool) {
 	if used, okUsed := firstGJSONFloat(cfg, "creditUsagePercent", "credit_usage_percent"); okUsed {
 		remaining := round2(clampPercent(100 - used))
 		summary.RemainingPercent = &remaining
-		return summary, true
-	}
-	monthlyLimit, okLimit := firstXaiCent(cfg, "monthlyLimit", "monthly_limit")
-	usedCents, okUsed := firstXaiCent(cfg, "used")
-	if okLimit && monthlyLimit > 0 && okUsed {
-		includedUsed := math.Min(usedCents, monthlyLimit)
-		remaining := round2(clampPercent(100 - (includedUsed/monthlyLimit)*100))
-		remainingUSD := round2(math.Max(0, monthlyLimit-includedUsed) / 100)
-		summary.RemainingPercent = &remaining
-		summary.MonthlyRemaining = &remainingUSD
 		return summary, true
 	}
 	return summary, false
@@ -587,21 +553,6 @@ func firstResult(root gjson.Result, paths ...string) gjson.Result {
 		}
 	}
 	return gjson.Result{}
-}
-
-func firstXaiCent(root gjson.Result, paths ...string) (float64, bool) {
-	for _, path := range paths {
-		value := root.Get(path)
-		if value.Type == gjson.JSON {
-			if parsed, okParsed := gjsonFloat(value.Get("val")); okParsed {
-				return parsed, true
-			}
-		}
-		if parsed, okParsed := gjsonFloat(value); okParsed {
-			return parsed, true
-		}
-	}
-	return 0, false
 }
 
 func minimumRemaining(windows []quotaWindowDetail) (float64, bool) {

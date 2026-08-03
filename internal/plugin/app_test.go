@@ -134,7 +134,7 @@ func TestKimiQuotaRowsUseRemainingOverUsedFallback(t *testing.T) {
 }
 
 func TestXaiSummaryReturnsCreditRemainingPercent(t *testing.T) {
-	summary, ok := parseXaiSummary([]byte(`{
+	summary, ok := parseXaiWeeklySummary([]byte(`{
 		"config": {
 			"currentPeriod": {"type": "weekly", "end": "2026-07-24T07:16:00Z"},
 			"creditUsagePercent": 10
@@ -148,19 +148,16 @@ func TestXaiSummaryReturnsCreditRemainingPercent(t *testing.T) {
 	}
 }
 
-func TestXaiSummaryReturnsBillingPeriodEndForMonthlyCredits(t *testing.T) {
-	summary, ok := parseXaiSummary([]byte(`{
+func TestXaiWeeklySummaryIgnoresMonthlyCredits(t *testing.T) {
+	summary, ok := parseXaiWeeklySummary([]byte(`{
 		"config": {
 			"monthlyLimit": {"val": 15000},
 			"used": {"val": 511},
 			"billingPeriodEnd": "2026-08-01T00:00:00Z"
 		}
 	}`))
-	if !ok || summary.RemainingPercent == nil || *summary.RemainingPercent != 96.59 {
-		t.Fatalf("summary = %#v, ok=%v, want 96.59%% remaining", summary, ok)
-	}
-	if summary.ResetAt != "2026-08-01T00:00:00Z" {
-		t.Fatalf("ResetAt = %q, want billing period end", summary.ResetAt)
+	if ok || summary.RemainingPercent != nil {
+		t.Fatalf("summary = %#v, ok=%v, want monthly quota ignored", summary, ok)
 	}
 }
 
