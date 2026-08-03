@@ -54,6 +54,8 @@ http://127.0.0.1:8317/v0/resource/plugins/cpa-account-usage
 
 这些 provider 的 `balance` 表示剩余百分比，`unit` 为 `%`。响应顶层会尽量返回 `reset_at`、`used_percent`、`reset_credits`、`raw_balance` 等字段。
 
+Gemini 响应会同时返回 `five_hour`（5 小时额度）和 `weekly`（周额度），每个窗口都包含剩余百分比、已用百分比和刷新时间。为兼容现有调用，顶层 `balance`、`used_percent` 和 `reset_at` 默认使用 5 小时额度。
+
 Antigravity/Gemini 刷新 token 是可选能力。如果 CPA 已经能给插件有效 access token，不需要额外配置；只有插件需要刷新过期 Antigravity token 时，才需要在插件配置里设置 `antigravity_oauth_client_id` 和 `antigravity_oauth_client_secret`。
 
 当 provider 没有内置官方额度接口，或官方查询失败时：
@@ -71,6 +73,31 @@ curl "http://127.0.0.1:8317/v0/resource/plugins/cpa-account-usage/api/usage?prov
 ```
 
 `provider=grok` 会匹配 xAI 账号；`provider=gemini` 会匹配 Antigravity 账号里的 Gemini 模型额度。
+
+Gemini 响应示例：
+
+```json
+{
+  "isValid": true,
+  "balance": 74,
+  "unit": "%",
+  "reset_at": "2026-08-03T12:00:00Z",
+  "used_percent": 26,
+  "five_hour": {
+    "balance": 74,
+    "unit": "%",
+    "reset_at": "2026-08-03T12:00:00Z",
+    "used_percent": 26
+  },
+  "weekly": {
+    "balance": 31,
+    "unit": "%",
+    "reset_at": "2026-08-09T12:00:00Z",
+    "used_percent": 69
+  },
+  "accounts": []
+}
+```
 
 ## 构建
 

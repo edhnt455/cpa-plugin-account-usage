@@ -26,7 +26,7 @@ const (
 const (
 	PluginID             = "cpa-account-usage"
 	PluginName           = "cpa-account-usage"
-	Version              = "0.4.0"
+	Version              = "0.6.0"
 	PublicUsageRoutePath = "/api/usage"
 )
 
@@ -103,15 +103,15 @@ type ManagementResponse struct {
 }
 
 type PluginConfig struct {
-	Enabled                       bool                      `yaml:"enabled"`
-	Aggregate                     string                    `yaml:"aggregate"`
-	DefaultUnit                   string                    `yaml:"default_unit"`
-	StatusOnlyUnit                string                    `yaml:"status_only_unit"`
+	Enabled                      bool                      `yaml:"enabled"`
+	Aggregate                    string                    `yaml:"aggregate"`
+	DefaultUnit                  string                    `yaml:"default_unit"`
+	StatusOnlyUnit               string                    `yaml:"status_only_unit"`
 	AntigravityOAuthClientID     string                    `yaml:"antigravity_oauth_client_id"`
 	AntigravityOAuthClientSecret string                    `yaml:"antigravity_oauth_client_secret"`
-	IncludeProviders              []string                  `yaml:"include_providers"`
-	ExcludeProviders              []string                  `yaml:"exclude_providers"`
-	Providers                     map[string]ProviderConfig `yaml:"providers"`
+	IncludeProviders             []string                  `yaml:"include_providers"`
+	ExcludeProviders             []string                  `yaml:"exclude_providers"`
+	Providers                    map[string]ProviderConfig `yaml:"providers"`
 }
 
 type ProviderConfig struct {
@@ -147,28 +147,39 @@ type UsageResponse struct {
 	UsedPercent    float64        `json:"used_percent,omitempty"`
 	RawBalance     string         `json:"raw_balance,omitempty"`
 	ResetCredits   int            `json:"reset_credits,omitempty"`
+	FiveHour       *QuotaWindow   `json:"five_hour,omitempty"`
+	Weekly         *QuotaWindow   `json:"weekly,omitempty"`
 	Error          string         `json:"error,omitempty"`
 }
 
+type QuotaWindow struct {
+	Balance     float64 `json:"balance"`
+	Unit        string  `json:"unit"`
+	ResetAt     string  `json:"reset_at,omitempty"`
+	UsedPercent float64 `json:"used_percent"`
+}
+
 type AccountUsage struct {
-	AuthIndex      string  `json:"auth_index,omitempty"`
-	Name           string  `json:"name,omitempty"`
-	Provider       string  `json:"provider,omitempty"`
-	Email          string  `json:"email,omitempty"`
-	Status         string  `json:"status,omitempty"`
-	StatusMessage  string  `json:"status_message,omitempty"`
-	Available      bool    `json:"available"`
-	Known          bool    `json:"known"`
-	Balance        float64 `json:"balance,omitempty"`
-	Unit           string  `json:"unit,omitempty"`
-	Source         string  `json:"source,omitempty"`
-	ResetAt        string  `json:"reset_at,omitempty"`
-	UsedPercent    float64 `json:"used_percent,omitempty"`
-	RawBalance     string  `json:"raw_balance,omitempty"`
-	ResetCredits   int     `json:"reset_credits,omitempty"`
-	NextRetryAfter string  `json:"next_retry_after,omitempty"`
-	Error          string  `json:"error,omitempty"`
-	Details        any     `json:"details,omitempty"`
+	AuthIndex      string       `json:"auth_index,omitempty"`
+	Name           string       `json:"name,omitempty"`
+	Provider       string       `json:"provider,omitempty"`
+	Email          string       `json:"email,omitempty"`
+	Status         string       `json:"status,omitempty"`
+	StatusMessage  string       `json:"status_message,omitempty"`
+	Available      bool         `json:"available"`
+	Known          bool         `json:"known"`
+	Balance        float64      `json:"balance,omitempty"`
+	Unit           string       `json:"unit,omitempty"`
+	Source         string       `json:"source,omitempty"`
+	ResetAt        string       `json:"reset_at,omitempty"`
+	UsedPercent    float64      `json:"used_percent,omitempty"`
+	RawBalance     string       `json:"raw_balance,omitempty"`
+	ResetCredits   int          `json:"reset_credits,omitempty"`
+	FiveHour       *QuotaWindow `json:"five_hour,omitempty"`
+	Weekly         *QuotaWindow `json:"weekly,omitempty"`
+	NextRetryAfter string       `json:"next_retry_after,omitempty"`
+	Error          string       `json:"error,omitempty"`
+	Details        any          `json:"details,omitempty"`
 }
 
 type HostAuthListResponse struct {

@@ -88,6 +88,18 @@ func TestPublicUsageResponseStripsAccounts(t *testing.T) {
 		Unit:        "%",
 		ResetAt:     "2026-07-25T08:31:56Z",
 		UsedPercent: 47,
+		FiveHour: &QuotaWindow{
+			Balance:     53,
+			Unit:        "%",
+			ResetAt:     "2026-07-25T08:31:56Z",
+			UsedPercent: 47,
+		},
+		Weekly: &QuotaWindow{
+			Balance:     81,
+			Unit:        "%",
+			ResetAt:     "2026-07-30T08:31:56Z",
+			UsedPercent: 19,
+		},
 		Accounts: []AccountUsage{{
 			AuthIndex: "secret-auth-index",
 			Email:     "user@example.com",
@@ -102,6 +114,9 @@ func TestPublicUsageResponseStripsAccounts(t *testing.T) {
 	}
 	if resp.ResetAt != "2026-07-25T08:31:56Z" || resp.UsedPercent != 47 {
 		t.Fatalf("public quota details = %q/%v, want reset/47", resp.ResetAt, resp.UsedPercent)
+	}
+	if resp.FiveHour == nil || resp.FiveHour.Balance != 53 || resp.Weekly == nil || resp.Weekly.Balance != 81 {
+		t.Fatalf("public quota windows = %#v/%#v, want 5h=53 and weekly=81", resp.FiveHour, resp.Weekly)
 	}
 }
 
@@ -174,5 +189,60 @@ func TestAntigravityBucketsCanFilterGeminiGroup(t *testing.T) {
 	remaining, ok := minimumRemaining(buckets)
 	if !ok || remaining != 72 {
 		t.Fatalf("remaining = %v/%v, want 72/true", remaining, ok)
+	}
+}
+
+func TestAntigravityQuotaBalanceDefaultsToFiveHourAndExposesWeekly(t *testing.T) {
+	balance, ok := antigravityQuotaBalance([]byte(`{
+		"response": {
+			"groups": [{
+				"displayName": "Gemini Models",
+				"buckets": [{
+					"bucketId": "gemini-weekly",
+					"displayName": "Weekly Limit",
+					"window": "weekly",
+					"remainingFraction": 0.31,
+					"resetTime": "2026-08-09T12:00:00Z"
+				}, {
+					"bucketId": "gemini-five-hour",
+					"displayName": "Five Hour Limit",
+					"window": "5h",
+					"remainingFraction": 0.74,
+					"resetTime": "2026-08-03T12:00:00Z"
+				}]
+			}, {
+				"displayName": "Claude and GPT Models",
+				"buckets": [{
+					"window": "5h",
+					"remainingFraction": 0.05,
+					"resetTime": "2026-08-03T11:00:00Z"
+				}]
+			}]
+		}
+	}`), "gemini", "project-123")
+	if !ok {
+		t.Fatal("antigravityQuotaBalance() ok = false")
+	}
+	if balance.Balance != 74 || balance.UsedPercent != 26 || balance.ResetAt != "2026-08-03T12:00:00Z" {
+		t.Fatalf("default balance = %v/%v/%q, want five-hour 74/26/reset", balance.Balance, balance.UsedPercent, balance.ResetAt)
+	}
+	if balance.FiveHour == nil || balance.FiveHour.Balance != 74 || balance.FiveHour.ResetAt != "2026-08-03T12:00:00Z" {
+		t.Fatalf("five-hour window = %#v, want 74%% and reset time", balance.FiveHour)
+	}
+	if balance.Weekly == nil || balance.Weekly.Balance != 31 || balance.Weekly.ResetAt != "2026-08-09T12:00:00Z" {
+		t.Fatalf("weekly window = %#v, want 31%% and reset time", balance.Weekly)
+	}
+}
+
+func TestNormalizeQuotaWindowSupportsLabels(t *testing.T) {
+	for input, want := range map[string]string{
+		"Five Hour Limit": "5h",
+		"5-hour":          "5h",
+		"Weekly Limit":    "weekly",
+		"seven_day":       "weekly",
+	} {
+		if got := normalizeQuotaWindow(input); got != want {
+			t.Errorf("normalizeQuotaWindow(%q) = %q, want %q", input, got, want)
+		}
 	}
 }

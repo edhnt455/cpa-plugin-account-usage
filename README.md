@@ -54,6 +54,8 @@ By default, the plugin automatically checks official quota endpoints for support
 
 For these providers, `balance` is the remaining percentage and `unit` is `%`. Top-level responses include provider-specific details such as `used_percent`, `reset_at`, `reset_credits`, and `raw_balance` when available.
 
+Gemini responses expose both quota windows as `five_hour` and `weekly`, including each window's remaining balance, used percentage, and reset time. For backward compatibility, the top-level `balance`, `used_percent`, and `reset_at` use the 5-hour window by default.
+
 Antigravity/Gemini token refresh is optional. If CPA already exposes a valid access token, no extra config is needed. If the plugin must refresh an expired Antigravity token, set `antigravity_oauth_client_id` and `antigravity_oauth_client_secret` in the plugin config.
 
 When a provider has no built-in quota probe, or the official probe fails:
@@ -76,6 +78,31 @@ Response shape:
   "unknown_count": 0,
   "reset_at": "2026-07-25T08:31:56Z",
   "used_percent": 33,
+  "accounts": []
+}
+```
+
+Gemini response shape:
+
+```json
+{
+  "isValid": true,
+  "balance": 74,
+  "unit": "%",
+  "reset_at": "2026-08-03T12:00:00Z",
+  "used_percent": 26,
+  "five_hour": {
+    "balance": 74,
+    "unit": "%",
+    "reset_at": "2026-08-03T12:00:00Z",
+    "used_percent": 26
+  },
+  "weekly": {
+    "balance": 31,
+    "unit": "%",
+    "reset_at": "2026-08-09T12:00:00Z",
+    "used_percent": 69
+  },
   "accounts": []
 }
 ```

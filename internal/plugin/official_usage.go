@@ -33,12 +33,16 @@ type officialBalance struct {
 	UsedPercent  float64
 	RawBalance   string
 	ResetCredits int
+	FiveHour     *QuotaWindow
+	Weekly       *QuotaWindow
 	Details      any
 	Error        string
 }
 
 type quotaWindowDetail struct {
 	ID        string  `json:"id"`
+	Label     string  `json:"label,omitempty"`
+	Window    string  `json:"window,omitempty"`
 	Used      float64 `json:"used_percent,omitempty"`
 	Remaining float64 `json:"remaining_percent,omitempty"`
 	ResetAt   string  `json:"reset_at,omitempty"`
@@ -53,6 +57,9 @@ func (a *App) fetchOfficialBalance(provider string, requestedProvider string, au
 	case "kimi":
 		return a.fetchKimiOfficialBalance(auth, hostCallbackID), true
 	case "gemini":
+		if normalizeProvider(requestedProvider) == "" {
+			requestedProvider = "gemini"
+		}
 		return a.fetchAntigravityOfficialBalance(auth, requestedProvider, hostCallbackID), true
 	case "antigravity":
 		return a.fetchAntigravityOfficialBalance(auth, requestedProvider, hostCallbackID), true
@@ -322,29 +329,56 @@ func (a *App) fetchAntigravityOfficialBalance(auth HostAuthFileEntry, requestedP
 			lastErr = errHTTP.Error()
 			continue
 		}
-		buckets := antigravityBuckets(body, requestedProvider)
-		remaining, okRemaining := minimumRemaining(buckets)
-		if !okRemaining {
+		balance, okBalance := antigravityQuotaBalance(body, requestedProvider, projectID)
+		if !okBalance {
 			lastErr = "antigravity quota payload did not contain usable buckets"
 			continue
 		}
-		return officialBalance{
-			Balance:     round2(remaining),
-			Unit:        "%",
-			Source:      "antigravity-quota-summary",
-			ResetAt:     firstResetAt(buckets),
-			UsedPercent: round2(100 - remaining),
-			Details:     map[string]any{"project_id": projectID, "buckets": buckets},
-		}
+		return balance
 	}
 	return officialBalance{Error: lastErr}
+}
+
+func antigravityQuotaBalance(body []byte, requestedProvider string, projectID string) (officialBalance, bool) {
+	buckets := antigravityBuckets(body, requestedProvider)
+	remaining, okRemaining := minimumRemaining(buckets)
+	if !okRemaining {
+		return officialBalance{}, false
+	}
+
+	fiveHour := quotaWindow(buckets, "5h")
+	weekly := quotaWindow(buckets, "weekly")
+	defaultBalance := round2(remaining)
+	defaultResetAt := firstResetAt(buckets)
+	if fiveHour != nil {
+		defaultBalance = fiveHour.Balance
+		defaultResetAt = fiveHour.ResetAt
+	}
+	return officialBalance{
+		Balance:     defaultBalance,
+		Unit:        "%",
+		Source:      "antigravity-quota-summary",
+		ResetAt:     defaultResetAt,
+		UsedPercent: round2(100 - defaultBalance),
+		FiveHour:    fiveHour,
+		Weekly:      weekly,
+		Details:     map[string]any{"project_id": projectID, "buckets": buckets},
+	}, true
 }
 
 func antigravityBuckets(body []byte, requestedProvider string) []quotaWindowDetail {
 	requestedProvider = normalizeProvider(requestedProvider)
 	onlyGemini := requestedProvider == "gemini"
 	buckets := make([]quotaWindowDetail, 0)
-	gjson.GetBytes(body, "groups").ForEach(func(groupKey, group gjson.Result) bool {
+	groups := firstGJSONResult(body,
+		"groups",
+		"response.groups",
+		"quotaSummary.groups",
+		"quota_summary.groups",
+		"response.quotaSummary.groups",
+		"response.quota_summary.groups",
+	)
+	groups.ForEach(func(groupKey, group gjson.Result) bool {
 		label := strings.ToLower(firstNonEmpty(group.Get("displayName").String(), group.Get("display_name").String(), groupKey.String()))
 		if onlyGemini && !strings.Contains(label, "gemini") {
 			return true
@@ -358,8 +392,19 @@ func antigravityBuckets(body []byte, requestedProvider string) []quotaWindowDeta
 				return true
 			}
 			remaining := clampPercent(remainingFraction * 100)
+			bucketID := firstNonEmpty(bucket.Get("bucketId").String(), bucket.Get("bucket_id").String(), bucketKey.String())
+			bucketLabel := firstNonEmpty(bucket.Get("displayName").String(), bucket.Get("display_name").String())
+			window := normalizeQuotaWindow(firstNonEmpty(
+				bucket.Get("window").String(),
+				bucket.Get("windowType").String(),
+				bucket.Get("window_type").String(),
+				bucketLabel,
+				bucketID,
+			))
 			buckets = append(buckets, quotaWindowDetail{
-				ID:        label + ":" + bucketKey.String(),
+				ID:        label + ":" + bucketID,
+				Label:     bucketLabel,
+				Window:    window,
 				Remaining: round2(remaining),
 				Used:      round2(100 - remaining),
 				ResetAt:   firstNonEmpty(bucket.Get("resetTime").String(), bucket.Get("reset_time").String()),
@@ -369,6 +414,35 @@ func antigravityBuckets(body []byte, requestedProvider string) []quotaWindowDeta
 		return true
 	})
 	return buckets
+}
+
+func normalizeQuotaWindow(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	normalized := strings.NewReplacer("_", " ", "-", " ").Replace(value)
+	switch {
+	case strings.Contains(value, "5h"), strings.Contains(normalized, "5 h"), strings.Contains(normalized, "5 hour"), strings.Contains(normalized, "five hour"):
+		return "5h"
+	case strings.Contains(normalized, "weekly"), strings.Contains(normalized, "7 day"), strings.Contains(value, "7d"), strings.Contains(value, "168h"), strings.Contains(normalized, "seven day"):
+		return "weekly"
+	default:
+		return value
+	}
+}
+
+func quotaWindow(windows []quotaWindowDetail, kind string) *QuotaWindow {
+	kind = normalizeQuotaWindow(kind)
+	for _, window := range windows {
+		if normalizeQuotaWindow(window.Window) != kind {
+			continue
+		}
+		return &QuotaWindow{
+			Balance:     window.Remaining,
+			Unit:        "%",
+			ResetAt:     window.ResetAt,
+			UsedPercent: window.Used,
+		}
+	}
+	return nil
 }
 
 func (a *App) antigravityAccessToken(auth HostAuthFileEntry, hostCallbackID string) (string, json.RawMessage, error) {

@@ -210,6 +210,8 @@ func (a *App) inspectAuthUsage(cfg PluginConfig, filter UsageRequest, auth HostA
 		result.UsedPercent = official.UsedPercent
 		result.RawBalance = official.RawBalance
 		result.ResetCredits = official.ResetCredits
+		result.FiveHour = official.FiveHour
+		result.Weekly = official.Weekly
 		result.Details = official.Details
 		return result
 	}
@@ -480,6 +482,8 @@ func applyAccountSummary(resp *UsageResponse, account AccountUsage) {
 	resp.UsedPercent = account.UsedPercent
 	resp.RawBalance = account.RawBalance
 	resp.ResetCredits = account.ResetCredits
+	resp.FiveHour = account.FiveHour
+	resp.Weekly = account.Weekly
 }
 
 func isPublicUsageRequest(req ManagementRequest) bool {
