@@ -255,12 +255,19 @@ func (a *App) fetchXaiOfficialBalance(auth HostAuthFileEntry, hostCallbackID str
 		return officialBalance{Error: "xai weekly billing payload did not contain usable remaining percent"}
 	}
 	remaining := *summary.RemainingPercent
+	weekly := &QuotaWindow{
+		Balance:     round2(remaining),
+		Unit:        "%",
+		ResetAt:     summary.ResetAt,
+		UsedPercent: round2(100 - remaining),
+	}
 	return officialBalance{
 		Balance:     round2(remaining),
 		Unit:        "%",
 		Source:      "xai-billing",
 		ResetAt:     summary.ResetAt,
 		UsedPercent: round2(100 - remaining),
+		Weekly:      weekly,
 		Details:     map[string]any{"summaries": []xaiSummary{summary}},
 	}
 }
@@ -282,6 +289,9 @@ func parseXaiWeeklySummary(body []byte) (xaiSummary, bool) {
 	if periodType == "" {
 		periodType = strings.ToLower(cfg.Get("current_period.type").String())
 	}
+	if !isXaiWeeklyPeriod(periodType) {
+		return xaiSummary{}, false
+	}
 	currentPeriod := firstResult(cfg, "currentPeriod", "current_period")
 	periodStart := firstNonEmpty(
 		currentPeriod.Get("start").String(),
@@ -299,12 +309,25 @@ func parseXaiWeeklySummary(body []byte) (xaiSummary, bool) {
 		PeriodEnd:   periodEnd,
 		ResetAt:     periodEnd,
 	}
-	if used, okUsed := firstGJSONFloat(cfg, "creditUsagePercent", "credit_usage_percent"); okUsed {
+	usage := firstResult(cfg, "creditUsagePercent", "credit_usage_percent")
+	if usage.Exists() {
+		used, okUsed := gjsonFloat(usage)
+		if !okUsed {
+			return summary, false
+		}
 		remaining := round2(clampPercent(100 - used))
 		summary.RemainingPercent = &remaining
 		return summary, true
 	}
-	return summary, false
+	// The credits endpoint omits the proto3 scalar when the weekly usage is 0%.
+	remaining := float64(100)
+	summary.RemainingPercent = &remaining
+	return summary, true
+}
+
+func isXaiWeeklyPeriod(periodType string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(periodType))
+	return normalized == "weekly" || normalized == "week" || strings.HasSuffix(normalized, "_weekly")
 }
 
 func (a *App) fetchAntigravityOfficialBalance(auth HostAuthFileEntry, requestedProvider string, hostCallbackID string) officialBalance {
