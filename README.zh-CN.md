@@ -48,11 +48,13 @@ http://127.0.0.1:8317/v0/resource/plugins/cpa-account-usage
 默认会按账号类型自动请求官方额度接口：
 
 - Codex：`https://chatgpt.com/backend-api/wham/usage`
-- xAI/Grok：`https://cli-chat-proxy.grok.com/v1/billing`
+- xAI/Grok：`https://cli-chat-proxy.grok.com/v1/billing?format=credits`
 - Kimi：`https://api.kimi.com/coding/v1/usages`
 - Antigravity/Gemini：Google Antigravity quota summary 接口
 
 这些 provider 的 `balance` 表示剩余百分比，`unit` 为 `%`。响应顶层会尽量返回 `reset_at`、`used_percent`、`reset_credits`、`raw_balance` 等字段。
+
+Grok 响应只使用 credits 接口返回的滚动 7 天额度，并在顶层和 `weekly` 字段中返回同一组数据；不再请求或返回旧的 30 天账期额度。
 
 Gemini 响应会同时返回 `five_hour`（5 小时额度）和 `weekly`（周额度），每个窗口都包含剩余百分比、已用百分比和刷新时间。为兼容现有调用，顶层 `balance`、`used_percent` 和 `reset_at` 默认使用 5 小时额度。
 

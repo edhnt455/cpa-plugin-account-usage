@@ -151,7 +151,7 @@ func TestKimiQuotaRowsUseRemainingOverUsedFallback(t *testing.T) {
 func TestXaiSummaryReturnsCreditRemainingPercent(t *testing.T) {
 	summary, ok := parseXaiWeeklySummary([]byte(`{
 		"config": {
-			"currentPeriod": {"type": "weekly", "end": "2026-07-24T07:16:00Z"},
+			"currentPeriod": {"type": "USAGE_PERIOD_TYPE_WEEKLY", "end": "2026-07-24T07:16:00Z"},
 			"creditUsagePercent": 10
 		}
 	}`))
@@ -163,16 +163,38 @@ func TestXaiSummaryReturnsCreditRemainingPercent(t *testing.T) {
 	}
 }
 
-func TestXaiWeeklySummaryIgnoresMonthlyCredits(t *testing.T) {
+func TestXaiWeeklySummaryTreatsOmittedUsageAsZero(t *testing.T) {
 	summary, ok := parseXaiWeeklySummary([]byte(`{
 		"config": {
-			"monthlyLimit": {"val": 15000},
-			"used": {"val": 511},
-			"billingPeriodEnd": "2026-08-01T00:00:00Z"
+			"currentPeriod": {"type": "USAGE_PERIOD_TYPE_WEEKLY", "end": "2026-07-24T07:16:00Z"}
+		}
+	}`))
+	if !ok || summary.RemainingPercent == nil || *summary.RemainingPercent != 100 {
+		t.Fatalf("summary = %#v, ok=%v, want 100%% remaining", summary, ok)
+	}
+}
+
+func TestXaiWeeklySummaryRejectsMonthlyPeriod(t *testing.T) {
+	summary, ok := parseXaiWeeklySummary([]byte(`{
+		"config": {
+			"currentPeriod": {"type": "MONTHLY", "end": "2026-08-01T00:00:00Z"},
+			"creditUsagePercent": 10
 		}
 	}`))
 	if ok || summary.RemainingPercent != nil {
 		t.Fatalf("summary = %#v, ok=%v, want monthly quota ignored", summary, ok)
+	}
+}
+
+func TestXaiWeeklySummaryRejectsInvalidUsage(t *testing.T) {
+	summary, ok := parseXaiWeeklySummary([]byte(`{
+		"config": {
+			"currentPeriod": {"type": "WEEKLY", "end": "2026-07-24T07:16:00Z"},
+			"creditUsagePercent": "invalid"
+		}
+	}`))
+	if ok || summary.RemainingPercent != nil {
+		t.Fatalf("summary = %#v, ok=%v, want invalid usage rejected", summary, ok)
 	}
 }
 

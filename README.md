@@ -48,11 +48,13 @@ Then use:
 By default, the plugin automatically checks official quota endpoints for supported providers:
 
 - Codex: `https://chatgpt.com/backend-api/wham/usage`
-- xAI/Grok: `https://cli-chat-proxy.grok.com/v1/billing`
+- xAI/Grok: `https://cli-chat-proxy.grok.com/v1/billing?format=credits`
 - Kimi: `https://api.kimi.com/coding/v1/usages`
 - Antigravity/Gemini: Google Antigravity quota summary endpoints
 
 For these providers, `balance` is the remaining percentage and `unit` is `%`. Top-level responses include provider-specific details such as `used_percent`, `reset_at`, `reset_credits`, and `raw_balance` when available.
+
+Grok responses use only the rolling 7-day quota returned by the credits endpoint. The same values are exposed at the top level and under `weekly`; the legacy 30-day billing quota is not requested or returned.
 
 Gemini responses expose both quota windows as `five_hour` and `weekly`, including each window's remaining balance, used percentage, and reset time. For backward compatibility, the top-level `balance`, `used_percent`, and `reset_at` use the 5-hour window by default.
 
