@@ -34,7 +34,7 @@ jobs:
         with:
           name: cpa-account-usage_linux_amd64
           path: dist/*.so
-      - run: gh release create "${GITHUB_REF_NAME}" dist/cpa-account-usage_linux_amd64.so dist/cpa-account-usage-${GITHUB_REF_NAME}.so --title "${GITHUB_REF_NAME}" --notes "Adds official quota probes for Codex, xAI/Grok, Kimi, and Antigravity/Gemini."
+      - run: gh release create "${GITHUB_REF_NAME}" dist/cpa-account-usage_linux_amd64.so dist/cpa-account-usage-${GITHUB_REF_NAME}.so --title "${GITHUB_REF_NAME}" --generate-notes
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}

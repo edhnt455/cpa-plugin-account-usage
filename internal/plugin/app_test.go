@@ -120,20 +120,42 @@ func TestPublicUsageResponseStripsAccounts(t *testing.T) {
 	}
 }
 
-func TestCodexQuotaWindowsReturnsRemainingPercent(t *testing.T) {
-	windows := codexQuotaWindows([]byte(`{
+func TestCodexQuotaBalanceDefaultsToFiveHourAndExposesWeekly(t *testing.T) {
+	balance, ok := codexQuotaBalance([]byte(`{
 		"rate_limit": {
 			"allowed": true,
 			"limit_reached": false,
 			"primary_window": {
 				"used_percent": 33,
 				"reset_at": 1784968316
+			},
+			"secondary_window": {
+				"used_percent": 71,
+				"reset_at": 1785573116
+			}
+		},
+		"code_review_rate_limit": {
+			"primary_window": {
+				"used_percent": 99,
+				"reset_at": 1784960000
+			},
+			"secondary_window": {
+				"used_percent": 98,
+				"reset_at": 1785570000
 			}
 		}
 	}`))
-	remaining, ok := minimumRemaining(windows)
-	if !ok || remaining != 67 {
-		t.Fatalf("remaining = %v/%v, want 67/true", remaining, ok)
+	if !ok {
+		t.Fatal("codexQuotaBalance() ok = false")
+	}
+	if balance.Balance != 67 || balance.UsedPercent != 33 || balance.ResetAt != "2026-07-25T08:31:56Z" {
+		t.Fatalf("default balance = %v/%v/%q, want five-hour 67/33/reset", balance.Balance, balance.UsedPercent, balance.ResetAt)
+	}
+	if balance.FiveHour == nil || balance.FiveHour.Balance != 67 || balance.FiveHour.UsedPercent != 33 {
+		t.Fatalf("five-hour window = %#v, want 67%% remaining and 33%% used", balance.FiveHour)
+	}
+	if balance.Weekly == nil || balance.Weekly.Balance != 29 || balance.Weekly.UsedPercent != 71 || balance.Weekly.ResetAt != "2026-08-01T08:31:56Z" {
+		t.Fatalf("weekly window = %#v, want 29%% remaining and reset time", balance.Weekly)
 	}
 }
 

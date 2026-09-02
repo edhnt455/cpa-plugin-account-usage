@@ -56,7 +56,7 @@ For these providers, `balance` is the remaining percentage and `unit` is `%`. To
 
 Grok responses use only the rolling 7-day quota returned by the credits endpoint. The same values are exposed at the top level and under `weekly`; the legacy 30-day billing quota is not requested or returned.
 
-Gemini responses expose both quota windows as `five_hour` and `weekly`, including each window's remaining balance, used percentage, and reset time. For backward compatibility, the top-level `balance`, `used_percent`, and `reset_at` use the 5-hour window by default.
+Codex and Gemini responses expose both quota windows as `five_hour` and `weekly`, including each window's remaining balance, used percentage, and reset time. For backward compatibility, the top-level `balance`, `used_percent`, and `reset_at` use the 5-hour window by default.
 
 Antigravity/Gemini token refresh is optional. If CPA already exposes a valid access token, no extra config is needed. If the plugin must refresh an expired Antigravity token, set `antigravity_oauth_client_id` and `antigravity_oauth_client_secret` in the plugin config.
 
@@ -84,7 +84,7 @@ Response shape:
 }
 ```
 
-Gemini response shape:
+Codex and Gemini response shape:
 
 ```json
 {

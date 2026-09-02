@@ -85,30 +85,22 @@ func (a *App) fetchCodexOfficialBalance(auth HostAuthFileEntry, hostCallbackID s
 	if errHTTP != nil {
 		return officialBalance{Error: errHTTP.Error()}
 	}
-	windows := codexQuotaWindows(body)
-	remaining, okRemaining := minimumRemaining(windows)
+	balance, okBalance := codexQuotaBalance(body)
 	creditsBalance := strings.TrimSpace(gjson.GetBytes(body, "credits.balance").String())
 	resetCredits := int(gjson.GetBytes(body, "rate_limit_reset_credits.available_count").Int())
 	if resetCredits == 0 {
 		resetCredits = int(gjson.GetBytes(body, "rateLimitResetCredits.availableCount").Int())
 	}
+	if okBalance {
+		balance.RawBalance = creditsBalance
+		balance.ResetCredits = resetCredits
+		return balance
+	}
 	details := map[string]any{
 		"plan_type":     gjson.GetBytes(body, "plan_type").String(),
-		"windows":       windows,
+		"windows":       codexQuotaWindows(body),
 		"credits":       creditsBalance,
 		"reset_credits": resetCredits,
-	}
-	if okRemaining {
-		return officialBalance{
-			Balance:      round2(remaining),
-			Unit:         "%",
-			Source:       "codex-wham-usage",
-			ResetAt:      firstResetAt(windows),
-			UsedPercent:  round2(100 - remaining),
-			RawBalance:   creditsBalance,
-			ResetCredits: resetCredits,
-			Details:      details,
-		}
 	}
 	if credits, okCredits := parseNumber(creditsBalance); okCredits {
 		return officialBalance{
@@ -121,6 +113,52 @@ func (a *App) fetchCodexOfficialBalance(auth HostAuthFileEntry, hostCallbackID s
 		}
 	}
 	return officialBalance{Error: "codex usage payload did not contain usable quota fields"}
+}
+
+func codexQuotaBalance(body []byte) (officialBalance, bool) {
+	windows := codexQuotaWindows(body)
+	fiveHour := quotaWindowByID(windows, "codex:primary")
+	weekly := quotaWindowByID(windows, "codex:secondary")
+
+	// Codex's primary and secondary rate-limit windows are the 5-hour and
+	// 7-day limits respectively. Keep the top-level response on the shorter
+	// window, matching the Gemini response contract.
+	selected := fiveHour
+	if selected == nil {
+		selected = weekly
+	}
+	if selected == nil {
+		return officialBalance{}, false
+	}
+
+	return officialBalance{
+		Balance:     selected.Balance,
+		Unit:        selected.Unit,
+		Source:      "codex-wham-usage",
+		ResetAt:     selected.ResetAt,
+		UsedPercent: selected.UsedPercent,
+		FiveHour:    fiveHour,
+		Weekly:      weekly,
+		Details: map[string]any{
+			"plan_type": gjson.GetBytes(body, "plan_type").String(),
+			"windows":   windows,
+		},
+	}, true
+}
+
+func quotaWindowByID(windows []quotaWindowDetail, id string) *QuotaWindow {
+	for _, window := range windows {
+		if window.ID != id {
+			continue
+		}
+		return &QuotaWindow{
+			Balance:     window.Remaining,
+			Unit:        "%",
+			ResetAt:     window.ResetAt,
+			UsedPercent: window.Used,
+		}
+	}
+	return nil
 }
 
 func codexQuotaWindows(body []byte) []quotaWindowDetail {
@@ -139,11 +177,11 @@ func addCodexLimitWindows(out *[]quotaWindowDetail, prefix string, limit gjson.R
 	if !limit.Exists() || limit.Type == gjson.Null {
 		return
 	}
-	addCodexWindow(out, prefix+":primary", firstResult(limit, "primary_window", "primaryWindow"), limit)
-	addCodexWindow(out, prefix+":secondary", firstResult(limit, "secondary_window", "secondaryWindow"), limit)
+	addCodexWindow(out, prefix+":primary", "5h", firstResult(limit, "primary_window", "primaryWindow"), limit)
+	addCodexWindow(out, prefix+":secondary", "weekly", firstResult(limit, "secondary_window", "secondaryWindow"), limit)
 }
 
-func addCodexWindow(out *[]quotaWindowDetail, id string, window gjson.Result, limit gjson.Result) {
+func addCodexWindow(out *[]quotaWindowDetail, id string, kind string, window gjson.Result, limit gjson.Result) {
 	if !window.Exists() || window.Type == gjson.Null {
 		return
 	}
@@ -161,6 +199,7 @@ func addCodexWindow(out *[]quotaWindowDetail, id string, window gjson.Result, li
 	remaining := clampPercent(100 - used)
 	*out = append(*out, quotaWindowDetail{
 		ID:        id,
+		Window:    kind,
 		Used:      round2(clampPercent(used)),
 		Remaining: round2(remaining),
 		ResetAt:   unixSecondsString(firstResult(window, "reset_at", "resetAt").Int(), firstResult(window, "reset_after_seconds", "resetAfterSeconds").Int()),
