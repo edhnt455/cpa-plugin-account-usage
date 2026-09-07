@@ -1,9 +1,16 @@
 package plugin
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
+
+type hostCallerFunc func(method string, payload []byte) ([]byte, error)
+
+func (f hostCallerFunc) Call(method string, payload []byte) ([]byte, error) {
+	return f(method, payload)
+}
 
 func TestDecodeConfigNormalizesProviderKeys(t *testing.T) {
 	cfg, err := DecodeConfig([]byte(`
@@ -69,6 +76,100 @@ func TestAggregateAccountsUsesMaxForPercentBalancesByDefault(t *testing.T) {
 func TestAuthAvailableHonorsCooldown(t *testing.T) {
 	if AuthAvailable(HostAuthFileEntry{Status: "active", NextRetryAfter: time.Now().Add(time.Minute)}) {
 		t.Fatal("AuthAvailable() = true during cooldown")
+	}
+}
+
+func TestAuthUsageProbeAllowedDuringTemporaryUnavailability(t *testing.T) {
+	auth := HostAuthFileEntry{
+		Status:         "error",
+		Unavailable:    true,
+		NextRetryAfter: time.Now().Add(time.Minute),
+	}
+	if AuthAvailable(auth) {
+		t.Fatal("AuthAvailable() = true for temporarily unavailable auth")
+	}
+	if !AuthUsageProbeAllowed(auth) {
+		t.Fatal("AuthUsageProbeAllowed() = false for temporarily unavailable auth")
+	}
+}
+
+func TestAuthUsageProbeRejectsDisabledAuth(t *testing.T) {
+	for _, auth := range []HostAuthFileEntry{
+		{Disabled: true, Status: "active"},
+		{Status: "disabled"},
+	} {
+		if AuthUsageProbeAllowed(auth) {
+			t.Fatalf("AuthUsageProbeAllowed(%#v) = true for disabled auth", auth)
+		}
+	}
+}
+
+func TestAggregateAccountsAcceptsKnownQuotaFromUnavailableAuth(t *testing.T) {
+	resp := AggregateAccounts(DefaultConfig(), []AccountUsage{
+		{Available: false, Known: true, Balance: 67, Unit: "%"},
+	})
+	if !resp.IsValid {
+		t.Fatal("IsValid = false for a successfully queried quota")
+	}
+	if resp.AvailableCount != 0 || resp.KnownCount != 1 || resp.UnknownCount != 0 {
+		t.Fatalf("counts = available:%d known:%d unknown:%d, want 0/1/0", resp.AvailableCount, resp.KnownCount, resp.UnknownCount)
+	}
+	if resp.Balance != 67 || resp.Unit != "%" {
+		t.Fatalf("Balance/unit = %v/%q, want 67/%%", resp.Balance, resp.Unit)
+	}
+}
+
+func TestInspectCodexUsageProbesTemporarilyUnavailableAuth(t *testing.T) {
+	httpCalled := false
+	app := NewApp(hostCallerFunc(func(method string, payload []byte) ([]byte, error) {
+		switch method {
+		case MethodHostAuthGet:
+			return OKEnvelope(HostAuthGetResponse{
+				AuthIndex: "codex-1",
+				JSON:      json.RawMessage(`{"access_token":"test-token","account_id":"account-1"}`),
+			})
+		case MethodHostHTTPDo:
+			httpCalled = true
+			var req HostHTTPRequest
+			if err := json.Unmarshal(payload, &req); err != nil {
+				t.Fatalf("decode HTTP request: %v", err)
+			}
+			if req.URL != codexUsageURL {
+				t.Fatalf("URL = %q, want %q", req.URL, codexUsageURL)
+			}
+			if got := headerValue(req.Headers, "User-Agent"); got != "codex-tui/0.149.1 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.149.1)" {
+				t.Fatalf("User-Agent = %q, want current management-center value", got)
+			}
+			return OKEnvelope(HostHTTPResponse{
+				StatusCode: 200,
+				Body: []byte(`{
+					"rate_limit": {
+						"primary_window": {"used_percent": 33, "reset_at": 1784968316},
+						"secondary_window": {"used_percent": 71, "reset_at": 1785573116}
+					}
+				}`),
+			})
+		default:
+			t.Fatalf("unexpected host method %q", method)
+			return nil, nil
+		}
+	}))
+
+	account := app.inspectAuthUsage(DefaultConfig(), UsageRequest{Provider: "codex"}, HostAuthFileEntry{
+		AuthIndex:      "codex-1",
+		Provider:       "codex",
+		Status:         "error",
+		Unavailable:    true,
+		NextRetryAfter: time.Now().Add(time.Minute),
+	}, "callback-1")
+	if !httpCalled {
+		t.Fatal("Codex quota HTTP request was not made")
+	}
+	if account.Available {
+		t.Fatal("Available = true for temporarily unavailable auth")
+	}
+	if !account.Known || account.Balance != 67 || account.Unit != "%" {
+		t.Fatalf("account quota = known:%v balance:%v unit:%q, want true/67/%%", account.Known, account.Balance, account.Unit)
 	}
 }
 

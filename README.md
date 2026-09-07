@@ -58,13 +58,15 @@ Grok responses use only the rolling 7-day quota returned by the credits endpoint
 
 Codex and Gemini responses expose both quota windows as `five_hour` and `weekly`, including each window's remaining balance, used percentage, and reset time. For backward compatibility, the top-level `balance`, `used_percent`, and `reset_at` use the 5-hour window by default.
 
+Quota probing matches the CPA management center: only explicitly disabled credentials are excluded. A credential that is temporarily unavailable for request routing due to an error or cooldown can still report a balance when the official quota request succeeds; `available_count` continues to report credentials currently eligible for CPA routing.
+
 Antigravity/Gemini token refresh is optional. If CPA already exposes a valid access token, no extra config is needed. If the plugin must refresh an expired Antigravity token, set `antigravity_oauth_client_id` and `antigravity_oauth_client_secret` in the plugin config.
 
 When a provider has no built-in quota probe, or the official probe fails:
 
 - `balance` is the number of currently available CPA auth accounts.
 - `unit` is `accounts`.
-- `isValid` is true when at least one matching account is available.
+- `isValid` is true when an official quota probe succeeds or at least one matching account is available.
 
 When a custom provider endpoint is configured, it overrides the built-in probe for that provider. The plugin reads a numeric `balance_path` from the upstream JSON response and aggregates known balances.
 

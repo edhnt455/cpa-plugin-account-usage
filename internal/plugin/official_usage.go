@@ -76,7 +76,7 @@ func (a *App) fetchCodexOfficialBalance(auth HostAuthFileEntry, hostCallbackID s
 	headers := map[string]string{
 		"Authorization": "Bearer " + token,
 		"Content-Type":  "application/json",
-		"User-Agent":    "codex_cli_rs/0.76.0 (Debian 13.0.0; x86_64) WindowsTerminal",
+		"User-Agent":    "codex-tui/0.149.1 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.149.1)",
 	}
 	if accountID := codexChatGPTAccountID(rawAuthJSON); accountID != "" {
 		headers["Chatgpt-Account-Id"] = accountID

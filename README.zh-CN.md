@@ -58,13 +58,15 @@ Grok 响应只使用 credits 接口返回的滚动 7 天额度，并在顶层和
 
 Codex 和 Gemini 响应会同时返回 `five_hour`（5 小时额度）和 `weekly`（7 天额度），每个窗口都包含剩余百分比、已用百分比和刷新时间。为兼容现有调用，顶层 `balance`、`used_percent` 和 `reset_at` 默认使用 5 小时额度。
 
+额度查询与 CPA 网页管理中心保持一致：只排除明确禁用的账号。即使账号因为临时错误或冷却状态暂时不可用于请求路由，只要官方额度接口查询成功，仍会返回余额；`available_count` 继续表示 CPA 当前可用于路由的账号数。
+
 Antigravity/Gemini 刷新 token 是可选能力。如果 CPA 已经能给插件有效 access token，不需要额外配置；只有插件需要刷新过期 Antigravity token 时，才需要在插件配置里设置 `antigravity_oauth_client_id` 和 `antigravity_oauth_client_secret`。
 
 当 provider 没有内置官方额度接口，或官方查询失败时：
 
 - `balance` 表示当前可用账号数量。
 - `unit` 为 `accounts`。
-- 至少有一个匹配账号可用时 `isValid=true`。
+- 官方额度查询成功，或至少有一个匹配账号可用时，`isValid=true`。
 
 配置自定义 provider 余额接口后，会覆盖该 provider 的内置查询。插件会读取上游 JSON 的 `balance_path`，并聚合已知余额。
 

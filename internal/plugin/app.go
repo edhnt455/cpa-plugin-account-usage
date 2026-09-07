@@ -190,10 +190,14 @@ func (a *App) inspectAuthUsage(cfg PluginConfig, filter UsageRequest, auth HostA
 	if okProvider && !providerConfigEnabled(providerCfg) {
 		return result
 	}
-	if !okProvider || providerCfg.URL == "" || !result.Available {
-		if !result.Available {
-			return result
-		}
+	// Match the management center's quota behavior: a credential may be
+	// temporarily unavailable for request routing while its quota endpoint is
+	// still readable. Only credentials that are explicitly disabled should be
+	// excluded from usage probes.
+	if !AuthUsageProbeAllowed(auth) {
+		return result
+	}
+	if !okProvider || providerCfg.URL == "" {
 		official, okOfficial := a.fetchOfficialBalance(provider, filter.Provider, auth, hostCallbackID)
 		if !okOfficial {
 			return result
@@ -438,6 +442,7 @@ func AggregateAccounts(cfg PluginConfig, accounts []AccountUsage) UsageResponse 
 		}
 		if account.Known {
 			resp.KnownCount++
+			resp.IsValid = true
 			units[account.Unit] = struct{}{}
 			mode := cfg.Aggregate
 			if account.Unit == "%" && (mode == "" || mode == "sum") {
@@ -505,6 +510,13 @@ func AuthAvailable(auth HostAuthFileEntry) bool {
 	}
 	status := strings.ToLower(strings.TrimSpace(auth.Status))
 	return status == "" || status == "active" || status == "ok"
+}
+
+func AuthUsageProbeAllowed(auth HostAuthFileEntry) bool {
+	if auth.Disabled {
+		return false
+	}
+	return strings.ToLower(strings.TrimSpace(auth.Status)) != "disabled"
 }
 
 func OKEnvelope(v any) ([]byte, error) {
